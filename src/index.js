@@ -1,10 +1,13 @@
 import JSZip from "jszip/dist/jszip.min";
 import saveAs from "file-saver";
 import _ from "lodash";
+import { getCharacterName, showLoadingEl, removeLoadingEl, injectParty, toggleSelectedElById } from "./helpers";
 import "./styles.css";
 
 // We save the character map from the first save to transfer stuff over to the second
 let characterDataMap;
+
+window.party = {}
 
 window.onload = () => {
     let firstFile, secondFile;
@@ -17,6 +20,7 @@ window.onload = () => {
 
     firstFileInput.onchange = (event) => {
         firstFile = event.target.files[0];
+        loadCharacters(firstFile)
     };
 
     secondFileInput.onchange = (event) => {
@@ -37,6 +41,50 @@ window.onload = () => {
         readAndDownloadSecondSave(secondFile);
     };
 };
+
+window.toggleSelection = (id) => {
+  party[id].shouldRespec = !party[id].shouldRespec;
+  toggleSelectedElById(id)
+}
+
+const loadCharacters = (file) => {
+  showLoadingEl()
+  // read file
+  readFile(file)
+    .then(([headerData, partyData]) => {
+        const parsedParty = JSON.parse(partyData);
+        const usedParty = {};
+
+        characterDataMap = getCharacterDataMap(parsedParty);
+        _.forEach(characterDataMap, ({ character, descriptor }) => {
+          usedParty[descriptor.Blueprint] = {
+            name: getCharacterName(descriptor),
+            shouldRespec: false,
+          }
+        });
+
+        injectPartyList(usedParty)
+    })
+}
+
+const injectPartyList = (usedParty) => {
+  removeLoadingEl()
+  injectParty(usedParty)
+  // assign to global
+  party = usedParty
+}
+
+const readFile = (file) => {
+  const reader = new JSZip();
+
+  return reader.loadAsync(file)
+      .then(() => {
+          return Promise.all([
+              reader.file("header.json").async("string"),
+              reader.file("party.json").async("string"),
+          ]);
+      })
+}
 
 /**
  * Reads and downloads the first modified save with the `Recreate` prop as true on all characters
@@ -60,7 +108,11 @@ const readAndDownloadFirstSave = (file) => {
             const parsedParty = JSON.parse(partyData);
 
             characterDataMap = getCharacterDataMap(parsedParty);
-            _.forEach(characterDataMap, ({ character, descriptor }) => descriptor.Recreate = true);
+            _.forEach(characterDataMap, ({ character, descriptor }) => {
+              if (party[descriptor.Blueprint].shouldRespec) {
+                return descriptor.Recreate = true;
+              }
+            });
 
             reader.file('header.json', JSON.stringify(parsedHeader));
             reader.file('party.json', JSON.stringify(parsedParty));

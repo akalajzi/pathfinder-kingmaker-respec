@@ -12,6 +12,18 @@
     max-width: 55rem;
 }
 
+.selected {
+  color: #006e1b;
+}
+
+.loading {
+  color: #6c6c6c;
+}
+
+ul.party-list > li {
+  cursor: pointer;
+}
+
 .file-input {
     margin-top: -1rem;
     margin-bottom: 1rem;
