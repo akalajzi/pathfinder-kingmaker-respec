@@ -6,7 +6,8 @@ import "./styles.css";
 
 // We save the character map from the first save to transfer stuff over to the second
 let characterDataMap;
-
+// Probably not the best idea to have it in window, but
+// we're already requiring user to stay put, and global namespace issues are highly unlikely
 window.party = {}
 
 window.onload = () => {
@@ -42,48 +43,55 @@ window.onload = () => {
     };
 };
 
+/**
+ * Onclick event handler for selecting/deselecting characters for respec
+ */
 window.toggleSelection = (id) => {
-  party[id].shouldRespec = !party[id].shouldRespec;
-  toggleSelectedElById(id)
+    party[id].shouldRespec = !party[id].shouldRespec;
+    toggleSelectedElById(id)
 }
 
+/**
+ * Reads the (first) file and loads the party characters
+ */
+
 const loadCharacters = (file) => {
-  showLoadingEl()
-  // read file
-  readFile(file)
+    showLoadingEl()
+    // read file
+    const reader = new JSZip();
+
+    return reader.loadAsync(file)
+    .then(() => {
+        return Promise.all([
+            reader.file("header.json").async("string"),
+            reader.file("party.json").async("string"),
+        ]);
+    })
     .then(([headerData, partyData]) => {
         const parsedParty = JSON.parse(partyData);
         const usedParty = {};
 
         characterDataMap = getCharacterDataMap(parsedParty);
         _.forEach(characterDataMap, ({ character, descriptor }) => {
-          usedParty[descriptor.Blueprint] = {
-            name: getCharacterName(descriptor),
-            shouldRespec: false,
-          }
+            usedParty[descriptor.Blueprint] = {
+                name: getCharacterName(descriptor),
+                shouldRespec: false,
+            }
         });
 
         injectPartyList(usedParty)
     })
 }
 
+/**
+ * Injects a party list into the DOM, and saves to global variable
+ *
+ */
 const injectPartyList = (usedParty) => {
-  removeLoadingEl()
-  injectParty(usedParty)
-  // assign to global
-  party = usedParty
-}
-
-const readFile = (file) => {
-  const reader = new JSZip();
-
-  return reader.loadAsync(file)
-      .then(() => {
-          return Promise.all([
-              reader.file("header.json").async("string"),
-              reader.file("party.json").async("string"),
-          ]);
-      })
+    removeLoadingEl()
+    injectParty(usedParty)
+    // assign to global
+    party = usedParty
 }
 
 /**
@@ -97,31 +105,31 @@ const readAndDownloadFirstSave = (file) => {
     const reader = new JSZip();
 
     return reader.loadAsync(file)
-        .then(() => {
-            return Promise.all([
-                reader.file("header.json").async("string"),
-                reader.file("party.json").async("string"),
-            ]);
-        })
-        .then(([headerData, partyData]) => {
-            const parsedHeader = Object.assign({}, JSON.parse(headerData), { Name: "Temp Respec" });
-            const parsedParty = JSON.parse(partyData);
+    .then(() => {
+        return Promise.all([
+            reader.file("header.json").async("string"),
+            reader.file("party.json").async("string"),
+        ]);
+    })
+    .then(([headerData, partyData]) => {
+        const parsedHeader = Object.assign({}, JSON.parse(headerData), { Name: "Temp Respec" });
+        const parsedParty = JSON.parse(partyData);
 
-            characterDataMap = getCharacterDataMap(parsedParty);
-            _.forEach(characterDataMap, ({ character, descriptor }) => {
-              if (party[descriptor.Blueprint].shouldRespec) {
+        characterDataMap = getCharacterDataMap(parsedParty);
+        _.forEach(characterDataMap, ({ character, descriptor }) => {
+            if (party[descriptor.Blueprint].shouldRespec) {
                 return descriptor.Recreate = true;
-              }
-            });
-
-            reader.file('header.json', JSON.stringify(parsedHeader));
-            reader.file('party.json', JSON.stringify(parsedParty));
-
-            return reader.generateAsync({ type: "blob" });
-        })
-        .then((blob) => {
-            saveAs(blob, "Temp_Respec.zks");
+            }
         });
+
+        reader.file('header.json', JSON.stringify(parsedHeader));
+        reader.file('party.json', JSON.stringify(parsedParty));
+
+        return reader.generateAsync({ type: "blob" });
+    })
+    .then((blob) => {
+        saveAs(blob, "Temp_Respec.zks");
+    });
 };
 
 /**
@@ -135,26 +143,26 @@ const readAndDownloadSecondSave = (file) => {
     const reader = new JSZip();
 
     return reader.loadAsync(file)
-        .then(() => {
-            return Promise.all([
-                reader.file("header.json").async("string"),
-                reader.file("party.json").async("string"),
-            ]);
-        })
-        .then(([headerData, partyData]) => {
-            const parsedHeader = Object.assign({}, JSON.parse(headerData), { Name: "Respec" });
-            const parsedParty = JSON.parse(partyData);
+    .then(() => {
+        return Promise.all([
+            reader.file("header.json").async("string"),
+            reader.file("party.json").async("string"),
+        ]);
+    })
+    .then(([headerData, partyData]) => {
+        const parsedHeader = Object.assign({}, JSON.parse(headerData), { Name: "Respec" });
+        const parsedParty = JSON.parse(partyData);
 
-            updateCharacterDataMap(getCharacterDataMap(parsedParty), characterDataMap);
+        updateCharacterDataMap(getCharacterDataMap(parsedParty), characterDataMap);
 
-            reader.file('header.json', JSON.stringify(parsedHeader));
-            reader.file('party.json', JSON.stringify(parsedParty));
+        reader.file('header.json', JSON.stringify(parsedHeader));
+        reader.file('party.json', JSON.stringify(parsedParty));
 
-            return reader.generateAsync({ type: "blob" });
-        })
-        .then((blob) => {
-            saveAs(blob, "Respec.zks");
-        });
+        return reader.generateAsync({ type: "blob" });
+    })
+    .then((blob) => {
+        saveAs(blob, "Respec.zks");
+    });
 };
 
 /**
